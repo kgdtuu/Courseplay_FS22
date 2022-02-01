@@ -225,11 +225,15 @@ function AIParameterSettingList:loadFromXMLFile(xmlFile, key)
 end
 
 function AIParameterSettingList:readStream(streamId, connection)
-	self:setToIx(streamReadInt32(streamId))
+	if not self:getIsUserSetting() then
+		self:setToIx(streamReadInt32(streamId))
+	end
 end
 
 function AIParameterSettingList:writeStream(streamId, connection)
-	streamWriteInt32(streamId, self.current)
+	if not self:getIsUserSetting() then
+		streamWriteInt32(streamId, self.current)
+	end
 end
 
 --- Sets the value.
@@ -285,6 +289,7 @@ function AIParameterSettingList:setValue(value)
 end
 
 function AIParameterSettingList:setDefault()
+	local current = self.current
 	if self:hasCallback(self.data.setDefaultFunc) then 
 		self:getCallback(self.data.setDefaultFunc)
 		self:debug("set to default by extern function.")
@@ -302,6 +307,9 @@ function AIParameterSettingList:setDefault()
 		return
 	end
 	self:setToIx(1)
+	if current ~= self.current then
+		self:raiseDirtyFlag()
+	end
 end
 
 --- Gets a specific value.
@@ -317,12 +325,18 @@ end
 function AIParameterSettingList:setNextItem()
 	local new = self:checkAndSetValidValue(self.current + 1)
 	self:setToIx(new)
+	if new ~= self.previous then
+		self:raiseDirtyFlag()
+	end
 end
 
 --- Set the previous value
 function AIParameterSettingList:setPreviousItem()
 	local new = self:checkAndSetValidValue(self.current - 1)
 	self:setToIx(new)
+	if new ~= self.previous then
+		self:raiseDirtyFlag()
+	end
 end
 
 function AIParameterSettingList:clone(...)
@@ -466,6 +480,7 @@ function AIParameterSettingList:showInputTextDialog()
 					local ix,diff = self:getClosestIx(v)
 					if diff < self.INPUT_VALUE_THRESHOLD then
 						self:setToIx(ix)
+						self:raiseDirtyFlag()
 					else 
 						self:setDefault()
 					end
@@ -527,6 +542,9 @@ end
 function AIParameterSettingList:onClick(state)
 	local new = self:checkAndSetValidValue(state)
 	self:setToIx(new)
+	if new ~= self.previous then
+		self:raiseDirtyFlag()
+	end
 end
 
 --- Raises an event and sends the callback string to the Settings controller class.
@@ -556,6 +574,18 @@ function AIParameterSettingList:getCallback(callbackStr)
 			return self.klass[callbackStr](self.vehicle)
 		else
 			return self.klass[callbackStr](self.klass)
+		end
+	end
+end
+
+function AIParameterSettingList:raiseDirtyFlag()
+	if not self:getIsUserSetting() then
+		if self.klass and self.klass.raiseDirtyFlag then
+			if self.vehicle ~= nil then 
+				self.klass.raiseDirtyFlag(self.vehicle,self)
+			else
+				self.klass:raiseDirtyFlag(self)
+			end
 		end
 	end
 end

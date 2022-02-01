@@ -1711,7 +1711,9 @@ function Course:writeStream(streamId, connection)
 	streamWriteFloat32(streamId, self.workWidth or 0)
 	streamWriteInt32(streamId, self.numHeadlands or 0 )
 	streamWriteInt32(streamId, self.multiTools or 0)
-	streamWriteString(streamId, self:serializeWaypoints(false))
+	for i,p in ipairs(self.waypoints) do 
+		p:writeStream(streamId)
+	end
 end
 
 ---@param vehicle  table
@@ -1753,8 +1755,12 @@ function Course.createFromStream(vehicle,streamId, connection)
 	local workWidth = streamReadFloat32(streamId)
 	local numHeadlands = streamReadInt32(streamId)
 	local multiTools = streamReadInt32(streamId)
-	local serializedWaypoints = streamReadString(streamId)
-	local course = Course(vehicle, Course.deserializeWaypoints(serializedWaypoints))
+	local numWaypoints = streamReadInt32(streamId)
+	local waypoints = {}
+	for ix=1,numWaypoints do 
+		table.insert(waypoints,Waypoint.initFromStream(streamId,ix))
+	end
+	local course = Course(vehicle, waypoints)
 	course.name = name
 	course.workWidth = workWidth
 	course.numHeadlands = numHeadlands
